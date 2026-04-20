@@ -1,0 +1,44 @@
+/* En el head del HTML */
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
+/* En tu script principal */
+const { createClient } = supabase;
+const db = createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
+
+// Cargar todos los perfiles al iniciar
+async function cargarPerfiles() {
+  const { data } = await db.from('perfiles')
+    .select('*').eq('activo', true);
+  return data;
+}
+
+// Cargar checklist de un perfil (lógicos + físicos)
+async function cargarChecklist(perfilId) {
+  const { data } = await db.from('matriz_accesos')
+    .select(`
+      *,
+      sistemas(nombre, aprobador, criticidad),
+      accesos_fisicos(nombre, aprobador, criticidad)
+    `)
+    .eq('perfil_id', perfilId);
+  return data;
+}
+
+// Generar solicitud → llama Edge Function → crea ticket en Jira
+async function generarSolicitud(nombre, email, perfilNombre, accesos) {
+  const res = await fetch(CONFIG.edgeFunctionUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      usuario_nombre: nombre,
+      usuario_email: email,
+      perfil: perfilNombre,
+      accesos: accesos
+    })
+  });
+  const result = await res.json();
+  if (result.ok) {
+    alert(`Ticket creado: ${result.ticket}`);
+  }
+}
